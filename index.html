@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AUDIO DOWNLOADER</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AUDIO DOWNLOADER</h1>
+      <p class="subtitle">Download audio or video from YouTube and more</p>
+    </header>
+    <form id="mainForm" autocomplete="off">
+      <label for="url" class="label">Paste a video/audio link:</label>
+      <input type="text" id="url" class="input" placeholder="e.g. https://youtu.be/..." required />
+
+      <button type="button" id="infoBtn" class="btn btn-primary">Get Info</button>
+
+      <div id="meta" class="card" style="display:none;">
+        <div class="media-info">
+          <img id="thumb" class="thumb" />
+          <div class="media-details">
+            <h2 id="title" class="media-title"></h2>
+            <p id="duration" class="media-meta"></p>
+          </div>
+        </div>
+        <div class="options">
+          <label>Format:
+            <select id="format" class="select">
+              <option value="mp3">MP3 (audio)</option>
+              <option value="mp4">MP4 (video)</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" id="downloadBtn" class="btn btn-accent w-100">Download</button>
+      </div>
+    </form>
+    <div id="msg" class="msg"></div>
+    <footer>
+      <p>
+        <span class="footer-brand">AUDIO DOWNLOADER</span>
+        &middot; <a href="https://github.com/wasi-master/cobalt" target="_blank" rel="noopener">Source</a>
+      </p>
+    </footer>
+  </div>
+  <script>
+    const BACKEND = "https://YOUR_BACKEND_URL"; // e.g. https://yourproject.onrender.com
+
+    function showMsg(msg, isError = false) {
+      const el = document.getElementById("msg");
+      el.textContent = msg;
+      el.classList.toggle("error", isError);
+    }
+
+    document.getElementById('infoBtn').onclick = async function() {
+      const url = document.getElementById('url').value.trim();
+      if (!url) return showMsg("Please enter a URL.", true);
+      showMsg("Fetching info...");
+      document.getElementById("meta").style.display = "none";
+      try {
+        const res = await fetch(BACKEND + "/api/info", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        if (!res.ok) {
+          showMsg("Could not fetch info.", true);
+          return;
+        }
+        const info = await res.json();
+        document.getElementById("meta").style.display = "";
+        document.getElementById("thumb").src = info.thumbnail || "";
+        document.getElementById("title").textContent = info.title || "No title";
+        document.getElementById("duration").textContent = info.duration
+          ? `Duration: ${info.duration}s`
+          : "";
+        showMsg("");
+        document.getElementById("downloadBtn").onclick = () => download(url);
+      } catch(e) {
+        showMsg("Error fetching info.", true);
+      }
+    };
+
+    async function download(url) {
+      showMsg("Preparing download...");
+      const format = document.getElementById("format").value;
+      try {
+        const res = await fetch(BACKEND + "/api/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url, format })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          showMsg(err.error || "Download failed.", true);
+          return;
+        }
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = window.URL.createObjectURL(blob);
+        a.download = format === "mp3" ? "audio.mp3" : "video.mp4";
+        a.click();
+        showMsg("Download started!");
+      } catch(e) {
+        showMsg("Error downloading file.", true);
+      }
+    }
+  </script>
+</body>
+</html>
