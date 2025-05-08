@@ -2,110 +2,210 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>AUDIO DOWNLOADER</title>
+  <title>Cobalt.tools - Ultra Downloader</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="style.css">
+  <link id="theme-style" rel="stylesheet" href="style-light.css">
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>AUDIO DOWNLOADER</h1>
-      <p class="subtitle">Download audio or video from YouTube and more</p>
-    </header>
-    <form id="mainForm" autocomplete="off">
-      <label for="url" class="label">Paste a video/audio link:</label>
-      <input type="text" id="url" class="input" placeholder="e.g. https://youtu.be/..." required />
-
-      <button type="button" id="infoBtn" class="btn btn-primary">Get Info</button>
-
-      <div id="meta" class="card" style="display:none;">
-        <div class="media-info">
-          <img id="thumb" class="thumb" />
-          <div class="media-details">
-            <h2 id="title" class="media-title"></h2>
-            <p id="duration" class="media-meta"></p>
-          </div>
-        </div>
-        <div class="options">
-          <label>Format:
-            <select id="format" class="select">
-              <option value="mp3">MP3 (audio)</option>
-              <option value="mp4">MP4 (video)</option>
-            </select>
-          </label>
-        </div>
-        <button type="button" id="downloadBtn" class="btn btn-accent w-100">Download</button>
-      </div>
-    </form>
-    <div id="msg" class="msg"></div>
-    <footer>
-      <p>
-        <span class="footer-brand">AUDIO DOWNLOADER</span>
-        &middot; <a href="https://github.com/wasi-master/cobalt" target="_blank" rel="noopener">Source</a>
-      </p>
-    </footer>
+    <h1>Cobalt.tools - Ultra Downloader</h1>
+    <div class="toggle-row">
+      <button id="theme-toggle">🌙 Dark Mode</button>
+      <button id="clipboard-btn">📋 Paste from Clipboard</button>
+    </div>
+    <input type="text" id="url" placeholder="Paste video/audio/playlist URL here" autocomplete="off" />
+    <button id="infoBtn">Get Info</button>
+    <div id="infoSection" style="display:none;">
+      <img id="thumb" style="max-width: 200px;">
+      <h2 id="title"></h2>
+      <div id="meta"></div>
+      <label>Format:
+        <select id="format">
+          <option value="mp3">MP3 (Audio)</option>
+          <option value="mp4">MP4 (Video)</option>
+          <option value="wav">WAV</option>
+          <option value="ogg">OGG</option>
+          <option value="m4a">M4A</option>
+          <option value="aac">AAC</option>
+        </select>
+      </label>
+      <label>Quality:
+        <select id="quality"></select>
+      </label>
+      <label>Filename:
+        <input type="text" id="filename" placeholder="Custom filename (optional)">
+      </label>
+      <label>Download section (start-end, e.g. 00:30-01:00): <input id="section" placeholder="optional"></label>
+      <label><input type="checkbox" id="subs"> Download Subtitles</label>
+      <label>Subtitles Language: <input id="sublang" value="en"></label>
+      <button id="downloadBtn">Download</button>
+    </div>
+    <div id="playlistSection" style="display:none;">
+      <h3>Playlist Items</h3>
+      <ul id="playlist-list"></ul>
+      <button id="downloadPlaylistBtn">Download Selected</button>
+    </div>
+    <div id="progress"></div>
+    <div id="history">
+      <h3>Recent Downloads</h3>
+      <ul id="history-list"></ul>
+    </div>
   </div>
   <script>
-    const BACKEND = "https://YOUR_BACKEND_URL"; // e.g. https://yourproject.onrender.com
+    // Theme
+    let darkMode = false;
+    document.getElementById('theme-toggle').onclick = function() {
+      darkMode = !darkMode;
+      document.getElementById('theme-style').href = darkMode ? 'style-dark.css' : 'style-light.css';
+      this.textContent = darkMode ? "☀️ Light Mode" : "🌙 Dark Mode";
+    };
 
-    function showMsg(msg, isError = false) {
-      const el = document.getElementById("msg");
-      el.textContent = msg;
-      el.classList.toggle("error", isError);
-    }
-
-    document.getElementById('infoBtn').onclick = async function() {
-      const url = document.getElementById('url').value.trim();
-      if (!url) return showMsg("Please enter a URL.", true);
-      showMsg("Fetching info...");
-      document.getElementById("meta").style.display = "none";
+    // Clipboard
+    document.getElementById('clipboard-btn').onclick = async function() {
       try {
-        const res = await fetch(BACKEND + "/api/info", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url })
-        });
-        if (!res.ok) {
-          showMsg("Could not fetch info.", true);
-          return;
-        }
-        const info = await res.json();
-        document.getElementById("meta").style.display = "";
-        document.getElementById("thumb").src = info.thumbnail || "";
-        document.getElementById("title").textContent = info.title || "No title";
-        document.getElementById("duration").textContent = info.duration
-          ? `Duration: ${info.duration}s`
-          : "";
-        showMsg("");
-        document.getElementById("downloadBtn").onclick = () => download(url);
-      } catch(e) {
-        showMsg("Error fetching info.", true);
+        const text = await navigator.clipboard.readText();
+        document.getElementById('url').value = text;
+      } catch (e) {
+        alert("Clipboard not supported");
       }
     };
 
-    async function download(url) {
-      showMsg("Preparing download...");
-      const format = document.getElementById("format").value;
-      try {
-        const res = await fetch(BACKEND + "/api/download", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, format })
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          showMsg(err.error || "Download failed.", true);
-          return;
+    // Load history
+    function addHistory(item) {
+      let hist = JSON.parse(localStorage.getItem("history") || "[]");
+      hist.unshift(item);
+      hist = hist.slice(0, 10);
+      localStorage.setItem("history", JSON.stringify(hist));
+      renderHistory();
+    }
+    function renderHistory() {
+      const hist = JSON.parse(localStorage.getItem("history") || "[]");
+      const ul = document.getElementById('history-list');
+      ul.innerHTML = "";
+      hist.forEach(i => {
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="${i.url}">${i.title}</a> (${i.format}, ${i.time})`;
+        ul.appendChild(li);
+      });
+    }
+    renderHistory();
+
+    // Info/metadata fetch
+    document.getElementById('infoBtn').onclick = async function() {
+      const url = document.getElementById('url').value.trim();
+      if (!url) return alert("Please enter a URL.");
+      document.getElementById('infoSection').style.display = "none";
+      document.getElementById('playlistSection').style.display = "none";
+      document.getElementById('progress').textContent = "Fetching info...";
+      // Try playlist first
+      let isPlaylist = false;
+      const playlistResp = await fetch("/api/playlist", {method:"POST",headers:{"Content-Type":"application/json"}, body:JSON.stringify({url})});
+      if (playlistResp.ok) {
+        const playlist = await playlistResp.json();
+        if (playlist.length > 1) {
+          isPlaylist = true;
+          document.getElementById('playlistSection').style.display = "";
+          const ul = document.getElementById('playlist-list');
+          ul.innerHTML = "";
+          playlist.forEach((item, idx) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<label><input type="checkbox" checked data-index="${idx}" data-id="${item.id}"> ${item.title || item.id}</label>`;
+            ul.appendChild(li);
+          });
+          document.getElementById('downloadPlaylistBtn').onclick = () => downloadPlaylist(url, playlist);
         }
-        const blob = await res.blob();
-        const a = document.createElement("a");
-        a.href = window.URL.createObjectURL(blob);
-        a.download = format === "mp3" ? "audio.mp3" : "video.mp4";
-        a.click();
-        showMsg("Download started!");
-      } catch(e) {
-        showMsg("Error downloading file.", true);
       }
+      // Now fetch info for single video
+      const resp = await fetch("/api/info", {method:"POST",headers:{"Content-Type":"application/json"}, body:JSON.stringify({url})});
+      if (!resp.ok) {
+        document.getElementById('progress').textContent = "Error fetching info.";
+        return;
+      }
+      const info = await resp.json();
+      document.getElementById('infoSection').style.display = "";
+      document.getElementById('progress').textContent = "";
+      document.getElementById('thumb').src = info.thumbnail || "";
+      document.getElementById('title').textContent = info.title || "Unknown Title";
+      document.getElementById('meta').innerHTML = `Duration: ${info.duration || "?"}s | Uploader: ${info.uploader || "?"}`;
+      // Fill quality options
+      const qualitySel = document.getElementById('quality');
+      qualitySel.innerHTML = "";
+      let formats = info.formats || [];
+      formats.filter(f => f.filesize && f.ext && f.format_note).forEach(f => {
+        const opt = document.createElement("option");
+        opt.value = f.format_id;
+        opt.textContent = `${f.ext} - ${f.format_note} (${Math.round((f.filesize||0)/1048576)}MB)`;
+        qualitySel.appendChild(opt);
+      });
+      if (!qualitySel.options.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "Best";
+        qualitySel.appendChild(opt);
+      }
+      // Download handler
+      document.getElementById('downloadBtn').onclick = () => download(url, info.title);
+    };
+
+    // Download
+    async function download(url, title) {
+      const format = document.getElementById('format').value;
+      const quality = document.getElementById('quality').value;
+      const filename = document.getElementById('filename').value;
+      const section = document.getElementById('section').value;
+      const subs = document.getElementById('subs').checked;
+      const sublang = document.getElementById('sublang').value;
+      document.getElementById('progress').textContent = "Downloading...";
+      let [start, end] = [null, null];
+      if (section && section.includes('-')) {
+        [start, end] = section.split('-').map(s => s.trim());
+      }
+      const resp = await fetch("/api/download", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          url, format, quality, filename, start, end, subtitles: subs ? sublang : undefined
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        document.getElementById('progress').textContent = err.error || "Download failed.";
+        return;
+      }
+      const blob = await resp.blob();
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename ? `${filename}.${format}` : `download.${format}`;
+      link.click();
+      document.getElementById('progress').textContent = "Download started!";
+      addHistory({ url, title, format, time: new Date().toLocaleString() });
+    }
+
+    // Playlist download
+    async function downloadPlaylist(url, playlist) {
+      const checked = Array.from(document.querySelectorAll('#playlist-list input[type=checkbox]:checked'));
+      if (!checked.length) return alert("Select at least one item.");
+      const playlistItems = checked.map(cb => cb.getAttribute("data-index"));
+      document.getElementById('progress').textContent = "Downloading playlist items...";
+      const resp = await fetch("/api/download", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          url, format:document.getElementById('format').value, playlistItems
+        })
+      });
+      if (!resp.ok) {
+        const err = await resp.json();
+        document.getElementById('progress').textContent = err.error || "Playlist download failed.";
+        return;
+      }
+      const blob = await resp.blob();
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `playlist.${document.getElementById('format').value}`;
+      link.click();
+      document.getElementById('progress').textContent = "Playlist download started!";
+      addHistory({ url, title: "Playlist", format: document.getElementById('format').value, time: new Date().toLocaleString() });
     }
   </script>
 </body>

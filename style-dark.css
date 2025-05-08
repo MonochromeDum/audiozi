@@ -1,0 +1,41 @@
+body {
+  background: #181a1b;
+  color: #eee;
+}
+.container {
+  max-width: 600px;
+  margin: 40px auto;
+  background: #232526;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 2px 12px #0007;
+}
+input, select, button {
+  font-size: 1em;
+  margin: 6px 0;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #232526;
+  color: #eee;
+}
+input[type="checkbox"] {
+  width: 1.1em;
+}
+#progress {
+  min-height: 24px;
+  margin: 10px 0;
+  font-weight: bold;
+  color: #adf;
+}
+.toggle-row {
+  display: flex;
+  gap: 1em;
+  margin-bottom: 1em;
+}
+#history {
+  margin-top: 2em;
+  background: #191a1d;
+  padding: 10px;
+  border-radius: 8px;
+}
